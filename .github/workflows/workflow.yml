@@ -1,5 +1,4 @@
 name: PipelineWorkflow
-
 on:
   push:
     branches:
@@ -9,13 +8,27 @@ on:
       - main
 
 jobs:
-    build:
-        name: Azure Pipeline
-        runs-on: ubuntu-latest
-        steps:
-        - name: Azure Pipelines Action
-          uses: Azure/pipelines@v1
-          with:
-            azure-devops-project-url: https://dev.azure.com/nadeekajk/AgileProject
-            azure-pipeline-name: 'ProjectA'
-            azure-devops-token: ${{ secrets.AZURE_DEVOPS_TOKEN }}
+  build:
+    name: Trigger Azure Pipeline
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Trigger Azure DevOps Pipeline
+      run: |
+        # Get the pipeline ID first
+        PIPELINE_ID=$(curl -s \
+          -u ":${{ secrets.AZURE_DEVOPS_TOKEN }}" \
+          -H "Content-Type: application/json" \
+          "https://dev.azure.com/nadeekajk/AgileProject/_apis/pipelines?api-version=6.0" \
+          | jq -r '.value[] | select(.name=="ProjectA") | .id')
+        
+        echo "Pipeline ID: $PIPELINE_ID"
+        
+        # Trigger the pipeline
+        curl -X POST \
+          -u ":${{ secrets.AZURE_DEVOPS_TOKEN }}" \
+          -H "Content-Type: application/json" \
+          -d '{"resources":{"repositories":{"self":{"refName":"refs/heads/main"}}}}' \
+          "https://dev.azure.com/nadeekajk/AgileProject/_apis/pipelines/$PIPELINE_ID/runs?api-version=6.0"
